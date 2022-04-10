@@ -42,8 +42,27 @@ symbol = oneOf "!$%&|*+-/:<=?>@^_~#"
 spaces :: Parser ()
 spaces = skipMany1 space
 
+parseList :: Parser LispVal
+parseList = sepBy parseExpr spaces <&> List
+
+parseDottedList :: Parser LispVal
+parseDottedList = do
+  head <- endBy parseExpr spaces
+  tail <- char '.' >> spaces >> parseExpr
+  return $ DottedList head tail
+
+parseQuoted :: Parser LispVal
+parseQuoted = do
+  char '\''
+  ex <- parseExpr
+  return $ List [Atom "quote", ex]
+
 parseExpr :: Parser LispVal
-parseExpr = parseAtom <|> parseString <|> parseNumber
+parseExpr = parseAtom <|> parseString <|> parseNumber <|> parseQuoted <|> do
+  char '('
+  exp <- try parseList <|> parseDottedList
+  char ')'
+  return exp
 
 readExpr :: String -> String
 readExpr input = case parse parseExpr "lisp" input of
