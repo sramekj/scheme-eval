@@ -7,11 +7,16 @@ import           Data.Functor                   ( (<&>) )
 import           Parsers
 
 eval :: LispVal -> ThrowsError LispVal
-eval val@(String _                  ) = return val
-eval val@(Number _                  ) = return val
-eval val@(Bool   _                  ) = return val
-eval (    List   [Atom "quote", val]) = return val
-eval (    List   (Atom f : args)    ) = mapM eval args >>= apply f
+eval val@(String _                             ) = return val
+eval val@(Number _                             ) = return val
+eval val@(Bool   _                             ) = return val
+eval (    List   [Atom "quote", val]           ) = return val
+eval (    List   [Atom "if", pred, conseq, alt]) = do
+  result <- eval pred
+  case result of
+    Bool False -> eval alt
+    _          -> eval conseq
+eval (List (Atom f : args)) = mapM eval args >>= apply f
 eval badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
 
 apply :: String -> [LispVal] -> ThrowsError LispVal
