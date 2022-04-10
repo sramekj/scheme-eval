@@ -29,6 +29,18 @@ primitives =
   , ("mod"      , numBinOp mod)
   , ("quotient" , numBinOp quot)
   , ("remainder", numBinOp rem)
+  , ("="        , numBoolBinOp (==))
+  , ("<"        , numBoolBinOp (<))
+  , (">"        , numBoolBinOp (>))
+  , ("/="       , numBoolBinOp (/=))
+  , (">="       , numBoolBinOp (>=))
+  , ("<="       , numBoolBinOp (<=))
+  , ("&&"       , boolBoolBinOp (&&))
+  , ("||"       , boolBoolBinOp (||))
+  , ("string=?" , strBoolBinOp (==))
+  , ("string?"  , strBoolBinOp (>))
+  , ("string<=?", strBoolBinOp (<=))
+  , ("string>=?", strBoolBinOp (>=))
   ]
 
 numBinOp :: (Integer -> Integer -> Integer) -> [LispVal] -> ThrowsError LispVal
@@ -44,3 +56,31 @@ unpackNum (String n) =
         else return $ fst $ head parsed
 unpackNum (List [n]) = unpackNum n
 unpackNum notNum     = throwError $ TypeMismatch "number" notNum
+
+unpackStr :: LispVal -> ThrowsError String
+unpackStr (String s) = return s
+unpackStr (Number s) = return $ show s
+unpackStr (Bool   s) = return $ show s
+unpackStr notString  = throwError $ TypeMismatch "string" notString
+
+unpackBool :: LispVal -> ThrowsError Bool
+unpackBool (Bool b) = return b
+unpackBool notBool  = throwError $ TypeMismatch "boolean" notBool
+
+boolBinOp
+  :: (LispVal -> ThrowsError a)
+  -> (a -> a -> Bool)
+  -> [LispVal]
+  -> ThrowsError LispVal
+boolBinOp unpacker op args = if length args /= 2
+  then throwError $ NumArgs 2 args
+  else do
+    left  <- unpacker $ head args
+    right <- unpacker $ args !! 1
+    return $ Bool $ left `op` right
+
+numBoolBinOp = boolBinOp unpackNum
+
+strBoolBinOp = boolBinOp unpackStr
+
+boolBoolBinOp = boolBinOp unpackBool
