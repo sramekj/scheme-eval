@@ -1,12 +1,25 @@
 module Parsers
   ( readExpr
+  , LispVal(..)
   ) where
 
 import           Data.Functor                   ( (<&>) )
-import           Text.ParserCombinators.Parsec
-                                         hiding ( spaces )
-import           Text.ParserCombinators.ReadPrec
-                                                ( reset )
+import           Text.ParserCombinators.Parsec  ( Parser
+                                                , char
+                                                , digit
+                                                , endBy
+                                                , letter
+                                                , many
+                                                , many1
+                                                , noneOf
+                                                , oneOf
+                                                , parse
+                                                , sepBy
+                                                , skipMany1
+                                                , space
+                                                , try
+                                                , (<|>)
+                                                )
 
 data LispVal
   = Atom String
@@ -64,7 +77,23 @@ parseExpr = parseAtom <|> parseString <|> parseNumber <|> parseQuoted <|> do
   char ')'
   return exp
 
-readExpr :: String -> String
+readExpr :: String -> LispVal
 readExpr input = case parse parseExpr "lisp" input of
-  Left  err -> "No match: " <> show err
-  Right val -> "Found value"
+  Left  err -> String $ "No match: " <> show err
+  Right val -> val
+
+showVal :: LispVal -> String
+showVal (String contents) = "\"" <> contents <> "\""
+showVal (Atom   name    ) = name
+showVal (Number contents) = show contents
+showVal (Bool   True    ) = "#t"
+showVal (Bool   False   ) = "#f"
+showVal (List   contents) = "(" <> unwordsList contents <> ")"
+showVal (DottedList head tail) =
+  "(" <> unwordsList head <> " . " <> showVal tail <> ")"
+
+unwordsList :: [LispVal] -> String
+unwordsList = unwords . map showVal
+
+instance Show LispVal where
+  show = showVal

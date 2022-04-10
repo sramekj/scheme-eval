@@ -25,6 +25,7 @@ source-repository head
 
 library
   exposed-modules:
+      Eval
       Parsers
   other-modules:
       Paths_scheme_eval
