@@ -1,8 +1,17 @@
 module Parsers
   ( readExpr
   , LispVal(..)
+  , LispError(..)
+  , ThrowsError
+  , extractValue
+  , trapError
   ) where
 
+import           Control.Monad.Except           ( MonadError
+                                                  ( catchError
+                                                  , throwError
+                                                  )
+                                                )
 import           Data.Functor                   ( (<&>) )
 import           Text.ParserCombinators.Parsec  ( Parser
                                                 , char
@@ -20,6 +29,8 @@ import           Text.ParserCombinators.Parsec  ( Parser
                                                 , try
                                                 , (<|>)
                                                 )
+import           Text.ParserCombinators.Parsec.Error
+                                                ( ParseError )
 
 data LispVal
   = Atom String
@@ -28,6 +39,17 @@ data LispVal
   | Number Integer
   | String String
   | Bool Bool
+
+data LispError
+  = NumArgs Integer [LispVal]
+  | TypeMismatch String LispVal
+  | Parser ParseError
+  | BadSpecialForm String LispVal
+  | NotFunction String String
+  | UnboundVar String String
+  | Default String
+
+type ThrowsError = Either LispError
 
 parseString :: Parser LispVal
 parseString = do
@@ -77,10 +99,10 @@ parseExpr = parseAtom <|> parseString <|> parseNumber <|> parseQuoted <|> do
   char ')'
   return exp
 
-readExpr :: String -> LispVal
+readExpr :: String -> ThrowsError LispVal
 readExpr input = case parse parseExpr "lisp" input of
-  Left  err -> String $ "No match: " <> show err
-  Right val -> val
+  Left  err -> throwError $ Parser err
+  Right val -> return val
 
 showVal :: LispVal -> String
 showVal (String contents) = "\"" <> contents <> "\""
@@ -97,3 +119,24 @@ unwordsList = unwords . map showVal
 
 instance Show LispVal where
   show = showVal
+
+showError :: LispError -> String
+showError (UnboundVar     message varname) = message <> ": " <> varname
+showError (BadSpecialForm message form   ) = message <> ": " <> show form
+showError (NotFunction    message func   ) = message <> ": " <> show func
+showError (NumArgs expected found) =
+  "Expected " <> show expected <> " args: found values " <> unwordsList found
+showError (TypeMismatch expected found) =
+  "Invalid type: expected " <> expected <> ", found " <> show found
+showError (Parser  parseErr) = "Parse error at " <> show parseErr
+showError (Default message ) = message
+
+instance Show LispError where
+  show = showError
+
+trapError :: ThrowsError String -> ThrowsError String
+trapError action = catchError action (return . show)
+
+extractValue :: ThrowsError a -> a
+extractValue (Right val) = val
+extractValue _           = error "Invalid operation"
