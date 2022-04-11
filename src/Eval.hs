@@ -2,11 +2,24 @@
 
 module Eval
   ( eval
+  , IOThrowsError(..)
   ) where
 
 import           Control.Monad.Except
 import           Data.Functor                   ( (<&>) )
+import           Data.IORef
 import           Parsers
+
+type Env = IORef [(String, IORef LispVal)]
+
+type IOThrowsError = ExceptT LispError IO
+
+nullEnv :: IO Env
+nullEnv = newIORef []
+
+liftThrows :: ThrowsError a -> IOThrowsError a
+liftThrows (Left  err) = throwError err
+liftThrows (Right val) = return val
 
 eval :: LispVal -> ThrowsError LispVal
 eval val@(String _                             ) = return val

@@ -2,11 +2,14 @@ module Main where
 
 import           Control.Applicative            ( liftA2 )
 import           Control.Monad                  ( liftM )
-import           Eval                           ( eval )
+import           Control.Monad.Except
+import           Data.Functor                   ( (<&>) )
+import           Eval                           ( IOThrowsError
+                                                , eval
+                                                )
 import           GHC.Event.Windows              ( processRemoteCompletion )
-import           Parsers                        ( extractValue
+import           Parsers                        ( ThrowsError
                                                 , readExpr
-                                                , trapError
                                                 )
 import           System.Environment
 import           System.IO               hiding ( try )
@@ -33,6 +36,15 @@ runRepl :: IO ()
 runRepl = until_ (liftA2 (||) (== "quit") (== ":q"))
                  (readPrompt "Lisp>>> ")
                  evalAndPrint
+
+trapError action = catchError action (return . show)
+
+extractValue :: ThrowsError a -> a
+extractValue (Right val) = val
+extractValue _           = error "Invalid operation"
+
+runIOThrows :: IOThrowsError String -> IO String
+runIOThrows action = runExceptT (trapError action) <&> extractValue
 
 main :: IO ()
 main = do

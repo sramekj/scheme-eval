@@ -2,9 +2,7 @@ module Parsers
   ( readExpr
   , LispVal(..)
   , LispError(..)
-  , ThrowsError
-  , extractValue
-  , trapError
+  , ThrowsError(..)
   ) where
 
 import           Control.Monad.Except           ( MonadError
@@ -133,10 +131,3 @@ showError (Default message ) = message
 
 instance Show LispError where
   show = showError
-
-trapError :: ThrowsError String -> ThrowsError String
-trapError action = catchError action (return . show)
-
-extractValue :: ThrowsError a -> a
-extractValue (Right val) = val
-extractValue _           = error "Invalid operation"

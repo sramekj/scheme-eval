@@ -38,6 +38,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - scheme-eval
+    - mtl
 
 tests:
   scheme-eval-test:
