@@ -4,14 +4,15 @@ import           Control.Applicative            ( liftA2 )
 import           Control.Monad                  ( liftM )
 import           Control.Monad.Except
 import           Data.Functor                   ( (<&>) )
-import           Eval                           ( Env
-                                                , IOThrowsError
+import           Eval                           ( IOThrowsError
                                                 , eval
                                                 , liftThrows
-                                                , nullEnv
+                                                , primitiveBindings
                                                 )
 import           GHC.Event.Windows              ( processRemoteCompletion )
-import           Parsers                        ( ThrowsError
+import           Parsers                        ( Env
+                                                , ThrowsError
+                                                , nullEnv
                                                 , readExpr
                                                 )
 import           System.Environment
@@ -36,11 +37,11 @@ until_ pred prompt action = do
   if pred result then return () else action result >> until_ pred prompt action
 
 runOne :: String -> IO ()
-runOne expr = nullEnv >>= flip evalAndPrint expr
+runOne expr = primitiveBindings >>= flip evalAndPrint expr
 
 runRepl :: IO ()
 runRepl =
-  nullEnv
+  primitiveBindings
     >>= until_ (liftA2 (||) (== "quit") (== ":q")) (readPrompt "Lisp>>> ")
     .   evalAndPrint
 

@@ -1,8 +1,13 @@
+{-# LANGUAGE NamedFieldPuns #-}
+
 module Parsers
   ( readExpr
   , LispVal(..)
   , LispError(..)
   , ThrowsError(..)
+  , Env(..)
+  , nullEnv
+  , showVal
   ) where
 
 import           Control.Monad.Except           ( MonadError
@@ -11,6 +16,7 @@ import           Control.Monad.Except           ( MonadError
                                                   )
                                                 )
 import           Data.Functor                   ( (<&>) )
+import           Data.IORef
 import           Text.ParserCombinators.Parsec  ( Parser
                                                 , char
                                                 , digit
@@ -30,6 +36,11 @@ import           Text.ParserCombinators.Parsec  ( Parser
 import           Text.ParserCombinators.Parsec.Error
                                                 ( ParseError )
 
+type Env = IORef [(String, IORef LispVal)]
+
+nullEnv :: IO Env
+nullEnv = newIORef []
+
 data LispVal
   = Atom String
   | List [LispVal]
@@ -37,6 +48,8 @@ data LispVal
   | Number Integer
   | String String
   | Bool Bool
+  | PrimitiveFunc ([LispVal] -> ThrowsError LispVal)
+  | Func {params :: [String], vararg :: Maybe String, body :: [LispVal], closure :: Env}
 
 data LispError
   = NumArgs Integer [LispVal]
@@ -111,6 +124,15 @@ showVal (Bool   False   ) = "#f"
 showVal (List   contents) = "(" <> unwordsList contents <> ")"
 showVal (DottedList head tail) =
   "(" <> unwordsList head <> " . " <> showVal tail <> ")"
+showVal (PrimitiveFunc _) = "<primitive>"
+showVal (Func { params, vararg, body, closure }) =
+  "(lambda ("
+    <> unwords (map show params)
+    <> (case vararg of
+         Nothing  -> ""
+         Just arg -> " . " <> arg
+       )
+    <> ") ...)"
 
 unwordsList :: [LispVal] -> String
 unwordsList = unwords . map showVal
