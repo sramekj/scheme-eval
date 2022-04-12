@@ -5,19 +5,25 @@ module Parsers
 
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Functor                   ( (<&>) )
+import           Numeric                        ( readHex
+                                                , readOct
+                                                )
 import           Text.ParserCombinators.Parsec  ( Parser
                                                 , char
                                                 , digit
                                                 , endBy
+                                                , hexDigit
                                                 , letter
                                                 , many
                                                 , many1
                                                 , noneOf
+                                                , octDigit
                                                 , oneOf
                                                 , parse
                                                 , sepBy
                                                 , skipMany1
                                                 , space
+                                                , string
                                                 , try
                                                 , (<|>)
                                                 )
@@ -49,7 +55,45 @@ parseAtom = do
   return $ Atom atom
 
 parseNumber :: Parser LispVal
-parseNumber = many1 digit <&> (Number . read)
+parseNumber =
+  parseDecimal1 <|> parseDecimal2 <|> parseHex <|> parseOct <|> parseBin
+
+parseDecimal1 :: Parser LispVal
+parseDecimal1 = many1 digit <&> Number . read
+
+parseDecimal2 :: Parser LispVal
+parseDecimal2 = do
+  try $ string "#d"
+  str <- many1 digit
+  (return . Number . read) str
+
+parseHex :: Parser LispVal
+parseHex = do
+  try $ string "#x"
+  str <- many1 hexDigit
+  return $ Number (hex2dig str)
+
+parseOct :: Parser LispVal
+parseOct = do
+  try $ string "#o"
+  str <- many1 octDigit
+  return $ Number (oct2dig str)
+
+parseBin :: Parser LispVal
+parseBin = do
+  try $ string "#b"
+  str <- many1 (oneOf "10")
+  return $ Number (bin2dig str)
+
+oct2dig x = fst $ head (readOct x)
+
+hex2dig x = fst $ head (readHex x)
+
+bin2dig = bin2dig' 0
+
+bin2dig' digint "" = digint
+bin2dig' digint (x : xs) =
+  let old = 2 * digint + (if x == '0' then 0 else 1) in bin2dig' old xs
 
 symbol :: Parser Char
 symbol = oneOf "!$%&|*+-/:<=?>@^_~"
