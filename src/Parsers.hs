@@ -3,13 +3,8 @@ module Parsers
   , readExprList
   ) where
 
-import           Control.Monad.Except           ( MonadError
-                                                  ( catchError
-                                                  , throwError
-                                                  )
-                                                )
+import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Functor                   ( (<&>) )
-import           Data.IORef
 import           Text.ParserCombinators.Parsec  ( Parser
                                                 , char
                                                 , digit

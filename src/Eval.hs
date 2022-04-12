@@ -15,9 +15,6 @@ import           Data.IORef
 import           Data.Maybe                     ( isJust
                                                 , isNothing
                                                 )
-import           GHC.ExecutionStack             ( Location(functionName) )
-import           GHC.GHCi.Helpers               ( evalWrapper )
-import           GHC.RTS.Flags                  ( ParFlags(ParFlags) )
 import           Parsers                        ( readExpr
                                                 , readExprList
                                                 )
