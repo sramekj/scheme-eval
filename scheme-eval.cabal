@@ -27,6 +27,7 @@ library
   exposed-modules:
       Eval
       Parsers
+      Types
   other-modules:
       Paths_scheme_eval
   hs-source-dirs:

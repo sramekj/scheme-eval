@@ -3,9 +3,9 @@
 
 module Eval
   ( eval
-  , IOThrowsError(..)
   , liftThrows
   , primitiveBindings
+  , bindVars
   ) where
 
 import           Control.Exception              ( evaluate )
@@ -18,9 +18,18 @@ import           Data.Maybe                     ( isJust
 import           GHC.ExecutionStack             ( Location(functionName) )
 import           GHC.GHCi.Helpers               ( evalWrapper )
 import           GHC.RTS.Flags                  ( ParFlags(ParFlags) )
-import           Parsers
-
-type IOThrowsError = ExceptT LispError IO
+import           Parsers                        ( readExpr
+                                                , readExprList
+                                                )
+import           System.IO                      ( IOMode(ReadMode, WriteMode)
+                                                , hClose
+                                                , hGetLine
+                                                , hPrint
+                                                , openFile
+                                                , stdin
+                                                , stdout
+                                                )
+import           Types
 
 liftThrows :: ThrowsError a -> IOThrowsError a
 liftThrows (Left  err) = throwError err
@@ -60,6 +69,8 @@ eval env (List (Atom "lambda" : DottedList params varargs : body)) =
   makeVarargs varargs env params body
 eval env (List (Atom "lambda" : varargs@(Atom _) : body)) =
   makeVarargs varargs env [] body
+eval env (List [Atom "load", String filename]) =
+  load filename >>= fmap last . mapM (eval env)
 eval env (List (function : args)) = do
   func    <- eval env function
   argVals <- mapM (eval env) args
@@ -112,10 +123,27 @@ primitives =
   , ("equal?"   , equal)
   ]
 
+ioPrimitives :: [(String, [LispVal] -> IOThrowsError LispVal)]
+ioPrimitives =
+  [ ("apply"            , applyProc)
+  , ("open-input-file"  , makePort ReadMode)
+  , ("open-output-file" , makePort WriteMode)
+  , ("close-input-port" , closePort)
+  , ("close-output-port", closePort)
+  , ("read"             , readProc)
+  , ("write"            , writeProc)
+  , ("read-contents"    , readContents)
+  , ("read-all"         , readAll)
+  ]
+
 primitiveBindings :: IO Env
-primitiveBindings = nullEnv
-  >>= flip bindVars (map makePrimitiveFunc primitives)
-  where makePrimitiveFunc (var, func) = (var, PrimitiveFunc func)
+primitiveBindings =
+  nullEnv
+    >>= (  flip bindVars
+        $  map (makeFunc IOFunc)        ioPrimitives
+        <> map (makeFunc PrimitiveFunc) primitives
+        )
+  where makeFunc constructor (var, func) = (var, constructor func)
 
 data Unpacker = forall a . Eq a => AnyUnpacker (LispVal -> ThrowsError a)
 
@@ -250,3 +278,37 @@ bindVars envRef bindings = readIORef envRef >>= extendEnv bindings >>= newIORef
   addBinding (var, value) = do
     ref <- newIORef value
     return (var, ref)
+
+applyProc :: [LispVal] -> IOThrowsError LispVal
+applyProc [func, List args] = apply func args
+applyProc (func : args)     = apply func args
+applyProc _                 = return $ Bool False
+
+makePort :: IOMode -> [LispVal] -> IOThrowsError LispVal
+makePort mode [String filename] = fmap Port $ liftIO $ openFile filename mode
+makePort _    _                 = return $ Bool False
+
+closePort :: [LispVal] -> IOThrowsError LispVal
+closePort [Port port] = liftIO $ hClose port >> return (Bool True)
+closePort _           = return $ Bool False
+
+readProc :: [LispVal] -> IOThrowsError LispVal
+readProc []          = readProc [Port stdin]
+readProc [Port port] = liftIO (hGetLine port) >>= liftThrows . readExpr
+readProc _           = return $ Bool False
+
+writeProc :: [LispVal] -> IOThrowsError LispVal
+writeProc [obj]            = writeProc [obj, Port stdout]
+writeProc [obj, Port port] = liftIO $ hPrint port obj >> return (Bool True)
+writeProc _                = return $ Bool False
+
+readContents :: [LispVal] -> IOThrowsError LispVal
+readContents [String filename] = fmap String $ liftIO $ readFile filename
+readContents _                 = return $ Bool False
+
+load :: String -> IOThrowsError [LispVal]
+load filename = liftIO (readFile filename) >>= liftThrows . readExprList
+
+readAll :: [LispVal] -> IOThrowsError LispVal
+readAll [String filename] = List <$> load filename
+readAll _                 = return $ Bool False
