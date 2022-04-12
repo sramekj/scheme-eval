@@ -23,10 +23,21 @@ import           Text.ParserCombinators.Parsec  ( Parser
                                                 )
 import           Types
 
+escapedChars :: Parser Char
+escapedChars = do
+  char '\\'
+  c <- oneOf "\\\"nrt"
+  return $ case c of
+    '\\' -> c
+    '"'  -> c
+    'n'  -> '\n'
+    'r'  -> '\r'
+    't'  -> '\t'
+
 parseString :: Parser LispVal
 parseString = do
   char '"'
-  str <- many (noneOf "\"")
+  str <- many $ escapedChars <|> noneOf "\"\\"
   char '"'
   return $ String str
 
@@ -35,16 +46,18 @@ parseAtom = do
   first <- letter <|> symbol
   rest  <- many (letter <|> digit <|> symbol)
   let atom = [first] <> rest
-  return $ case atom of
-    "#t" -> Bool True
-    "#f" -> Bool False
-    _    -> Atom atom
+  return $ Atom atom
 
 parseNumber :: Parser LispVal
 parseNumber = many1 digit <&> (Number . read)
 
 symbol :: Parser Char
-symbol = oneOf "!$%&|*+-/:<=?>@^_~#"
+symbol = oneOf "!$%&|*+-/:<=?>@^_~"
+
+parseBool :: Parser LispVal
+parseBool = do
+  char '#'
+  (char 't' >> return (Bool True)) <|> (char 'f' >> return (Bool False))
 
 spaces :: Parser ()
 spaces = skipMany1 space
@@ -65,11 +78,12 @@ parseQuoted = do
   return $ List [Atom "quote", ex]
 
 parseExpr :: Parser LispVal
-parseExpr = parseAtom <|> parseString <|> parseNumber <|> parseQuoted <|> do
-  char '('
-  exp <- try parseList <|> parseDottedList
-  char ')'
-  return exp
+parseExpr =
+  parseAtom <|> parseString <|> parseNumber <|> parseBool <|> parseQuoted <|> do
+    char '('
+    exp <- try parseList <|> parseDottedList
+    char ')'
+    return exp
 
 readOrThrow :: Parser a -> String -> ThrowsError a
 readOrThrow parser input = case parse parser "lisp" input of
