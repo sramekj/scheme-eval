@@ -5,10 +5,13 @@ module Parsers
 
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Functor                   ( (<&>) )
-import           Numeric                        ( readHex
+import           Numeric                        ( readFloat
+                                                , readHex
                                                 , readOct
                                                 )
 import           Text.ParserCombinators.Parsec  ( Parser
+                                                , alphaNum
+                                                , anyChar
                                                 , char
                                                 , digit
                                                 , endBy
@@ -17,6 +20,7 @@ import           Text.ParserCombinators.Parsec  ( Parser
                                                 , many
                                                 , many1
                                                 , noneOf
+                                                , notFollowedBy
                                                 , octDigit
                                                 , oneOf
                                                 , parse
@@ -95,6 +99,18 @@ bin2dig' digint "" = digint
 bin2dig' digint (x : xs) =
   let old = 2 * digint + (if x == '0' then 0 else 1) in bin2dig' old xs
 
+parseCharacter :: Parser LispVal
+parseCharacter = do
+  try $ string "#\\"
+  value <- try (string "newline" <|> string "space") <|> do
+    x <- anyChar
+    notFollowedBy alphaNum
+    return [x]
+  return $ Character $ case value of
+    "space"   -> ' '
+    "newline" -> '\n'
+    _         -> head value
+
 symbol :: Parser Char
 symbol = oneOf "!$%&|*+-/:<=?>@^_~"
 
@@ -102,6 +118,13 @@ parseBool :: Parser LispVal
 parseBool = do
   char '#'
   (char 't' >> return (Bool True)) <|> (char 'f' >> return (Bool False))
+
+parseFloat :: Parser LispVal
+parseFloat = do
+  x <- many1 digit
+  char '.'
+  y <- many1 digit
+  return $ Float (fst . head $ readFloat (x <> "." <> y))
 
 spaces :: Parser ()
 spaces = skipMany1 space
@@ -123,11 +146,18 @@ parseQuoted = do
 
 parseExpr :: Parser LispVal
 parseExpr =
-  parseAtom <|> parseString <|> parseNumber <|> parseBool <|> parseQuoted <|> do
-    char '('
-    exp <- try parseList <|> parseDottedList
-    char ')'
-    return exp
+  parseAtom
+    <|> parseString
+    <|> try parseFloat
+    <|> try parseNumber
+    <|> try parseBool
+    <|> try parseCharacter
+    <|> parseQuoted
+    <|> do
+          char '('
+          exp <- try parseList <|> parseDottedList
+          char ')'
+          return exp
 
 readOrThrow :: Parser a -> String -> ThrowsError a
 readOrThrow parser input = case parse parser "lisp" input of

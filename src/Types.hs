@@ -30,6 +30,8 @@ data LispVal
   | Number Integer
   | String String
   | Bool Bool
+  | Character Char
+  | Float Double
   | PrimitiveFunc ([LispVal] -> ThrowsError LispVal)
   | Func {params :: [String], vararg :: Maybe String, body :: [LispVal], closure :: Env}
   | IOFunc ([LispVal] -> IOThrowsError LispVal)
