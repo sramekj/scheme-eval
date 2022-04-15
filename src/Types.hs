@@ -11,6 +11,7 @@ module Types
   ) where
 
 import           Control.Monad.Except
+import           Data.Complex                   ( Complex )
 import           Data.IORef
 import           System.IO                      ( Handle )
 import           Text.ParserCombinators.Parsec.Error
@@ -32,6 +33,8 @@ data LispVal
   | Bool Bool
   | Character Char
   | Float Double
+  | Ratio Rational
+  | Complex (Complex Double)
   | PrimitiveFunc ([LispVal] -> ThrowsError LispVal)
   | Func {params :: [String], vararg :: Maybe String, body :: [LispVal], closure :: Env}
   | IOFunc ([LispVal] -> IOThrowsError LispVal)
@@ -49,12 +52,16 @@ data LispError
 type ThrowsError = Either LispError
 
 showVal :: LispVal -> String
-showVal (String contents) = "\"" <> contents <> "\""
-showVal (Atom   name    ) = name
-showVal (Number contents) = show contents
-showVal (Bool   True    ) = "#t"
-showVal (Bool   False   ) = "#f"
-showVal (List   contents) = "(" <> unwordsList contents <> ")"
+showVal (String    contents) = "\"" <> contents <> "\""
+showVal (Atom      name    ) = name
+showVal (Number    contents) = show contents
+showVal (Character contents) = show contents
+showVal (Float     contents) = show contents
+showVal (Ratio     contents) = show contents
+showVal (Complex   contents) = show contents
+showVal (Bool      True    ) = "#t"
+showVal (Bool      False   ) = "#f"
+showVal (List      contents) = "(" <> unwordsList contents <> ")"
 showVal (DottedList head tail) =
   "(" <> unwordsList head <> " . " <> showVal tail <> ")"
 showVal (PrimitiveFunc _) = "<primitive>"

@@ -42,12 +42,15 @@ makeNormalFunc = makeFunc Nothing
 makeVarargs = makeFunc . Just . showVal
 
 eval :: Env -> LispVal -> IOThrowsError LispVal
-eval env val@(String _                             ) = return val
-eval env val@(Number _                             ) = return val
-eval env val@(Bool   _                             ) = return val
-eval env (    Atom   id                            ) = getVar env id
-eval env (    List   [Atom "quote", val]           ) = return val
-eval env (    List   [Atom "if", pred, conseq, alt]) = do
+eval env val@(String    _                             ) = return val
+eval env val@(Number    _                             ) = return val
+eval env val@(Bool      _                             ) = return val
+eval env val@(Float     _                             ) = return val
+eval env val@(Character _                             ) = return val
+eval env val@(Ratio     _                             ) = return val
+eval env (    Atom      id                            ) = getVar env id
+eval env (    List      [Atom "quote", val]           ) = return val
+eval env (    List      [Atom "if", pred, conseq, alt]) = do
   result <- eval env pred
   case result of
     Bool False -> eval env alt

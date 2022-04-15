@@ -4,7 +4,9 @@ module Parsers
   ) where
 
 import           Control.Monad.Except           ( MonadError(throwError) )
+import           Data.Complex
 import           Data.Functor                   ( (<&>) )
+import           Data.Ratio                     ( (%) )
 import           Numeric                        ( readFloat
                                                 , readHex
                                                 , readOct
@@ -144,10 +146,32 @@ parseQuoted = do
   ex <- parseExpr
   return $ List [Atom "quote", ex]
 
+parseRatio :: Parser LispVal
+parseRatio = do
+  x <- many1 digit
+  char '/'
+  y <- many1 digit
+  return $ Ratio (read x % read y)
+
+toDouble :: LispVal -> Double
+toDouble (Float  f) = realToFrac f
+toDouble (Number n) = fromIntegral n
+toDouble _          = error "Invalid conversion"
+
+parseComplex :: Parser LispVal
+parseComplex = do
+  x <- try parseFloat <|> parseDecimal1
+  char '+'
+  y <- try parseFloat <|> parseDecimal1
+  char 'i'
+  return $ Complex (toDouble x :+ toDouble y)
+
 parseExpr :: Parser LispVal
 parseExpr =
   parseAtom
     <|> parseString
+    <|> try parseComplex
+    <|> try parseRatio
     <|> try parseFloat
     <|> try parseNumber
     <|> try parseBool
